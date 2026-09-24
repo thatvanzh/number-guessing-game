@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Liquid Glass Guessing Game</title>
+    <style>
+        :root {
+            /* Dark Theme (Default) */
+            --bg-base: #0f0c29;
+            --blob-1: #ff2a5f;
+            --blob-2: #00d2ff;
+            --blob-3: #9d4edd;
+            --glass-bg: rgba(20, 20, 30, 0.4);
+            --glass-border: rgba(255, 255, 255, 0.15);
+            --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            --glass-inset: inset 0 0 20px rgba(255, 255, 255, 0.05);
+            --text-primary: #ffffff;
+            --text-secondary: rgba(255, 255, 255, 0.7);
+            --input-bg: rgba(0, 0, 0, 0.3);
+            --btn-bg: rgba(255, 255, 255, 0.1);
+            --btn-hover: rgba(255, 255, 255, 0.2);
+            --success: #34c759; /* iOS Green */
+            --warning: #ff9500; /* iOS Orange */
+            --error: #ff3b30;   /* iOS Red */
+            --info: #007aff;    /* iOS Blue */
+        }
+
+        [data-theme="light"] {
+            --bg-base: #e0e5ec;
+            --blob-1: #ff8a00;
+            --blob-2: #e52e71;
+            --blob-3: #00c6ff;
+            --glass-bg: rgba(255, 255, 255, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.8);
+            --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+            --glass-inset: inset 0 0 20px rgba(255, 255, 255, 0.5);
+            --text-primary: #1c1c1e;
+            --text-secondary: rgba(60, 60, 67, 0.6);
+            --input-bg: rgba(255, 255, 255, 0.5);
+            --btn-bg: rgba(255, 255, 255, 0.8);
+            --btn-hover: #ffffff;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-primary);
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background-color 0.5s ease;
+        }
+
+        .background-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -2;
+            overflow: hidden;
+        }
+
+        .blob {
+            position: absolute;
+            filter: blur(90px);
+            opacity: 0.8;
+            border-radius: 50%;
+            animation: float 20s infinite ease-in-out alternate;
+            transition: background 0.5s ease;
+        }
+
+        .blob-1 {
+            top: -10%; left: -10%; width: 50vw; height: 50vw;
+            background: var(--blob-1);
+            animation-delay: 0s;
+        }
+
+        .blob-2 {
+            bottom: -10%; right: -10%; width: 60vw; height: 60vw;
+            background: var(--blob-2);
+            animation-delay: -5s;
+        }
+
+        .blob-3 {
+            top: 40%; left: 40%; width: 40vw; height: 40vw;
+            background: var(--blob-3);
+            animation-delay: -10s;
+        }
+
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1) rotate(0deg); }
+            33% { transform: translate(15%, -15%) scale(1.1) rotate(10deg); }
+            66% { transform: translate(-15%, 15%) scale(0.9) rotate(-10deg); }
+            100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+        }
+
+        #confetti-canvas {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        .app-container {
+            position: relative;
+            width: 100%;
+            max-width: 440px;
+            height: 100%;
+            max-height: 850px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .view {
+            position: absolute;
+            width: calc(100% - 40px);
+            height: auto;
+            max-height: 90vh;
+            background: var(--glass-bg);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            border: 1px solid var(--glass-border);
+            border-radius: 36px;
+            box-shadow: var(--glass-shadow), var(--glass-inset);
+            padding: 32px 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            opacity: 0;
+            visibility: hidden;
+            transform: scale(0.95) translateY(10px);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 10;
+            overflow-y: auto;
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        
+        .view::-webkit-scrollbar {
+            display: none;
+        }
+
+        .view.active {
+            opacity: 1;
+            visibility: visible;
+            transform: scale(1) translateY(0);
+            z-index: 20;
+        }
+
+        h1, h2 {
+            text-align: center;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        h1 { font-size: 32px; margin-bottom: 8px; }
+        h2 { font-size: 24px; margin-bottom: 16px; }
+        
+        p.subtitle {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 15px;
+            margin-bottom: 24px;
+        }
+
+        .btn {
+            background: var(--btn-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 16px;
+            font-size: 17px;
+            font-weight: 600;
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .btn:hover { background: var(--btn-hover); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.15); }
+        .btn:active { transform: translateY(1px) scale(0.98); }
+        .btn-primary { background: var(--info); color: white; border: none; }
+        .btn-primary:hover { background: #006ce6; }
+        .btn-success { background: var(--success); color: white; border: none; }
+        .btn-danger { background: var(--error); color: white; border: none; }
+
+        /* Difficulty Cards */
+        .difficulty-grid {
+            display: grid;
+            gap: 16px;
+        }
+        
+        .diff-card {
+            background: var(--btn-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .diff-card:hover { transform: scale(1.03); background: var(--btn-hover); }
+        .diff-card h3 { font-size: 20px; margin-bottom: 5px; }
+        .diff-card p { font-size: 14px; color: var(--text-secondary); }
+
+        /* Game Input */
+        .input-group {
+            position: relative;
+            margin: 20px 0;
+        }
+        
+        input[type="number"] {
+            width: 100%;
+            background: var(--input-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 20px;
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--text-primary);
+            text-align: center;
+            outline: none;
+            transition: all 0.3s ease;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.1);
+            -moz-appearance: textfield;
+        }
+        input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type="number"]:focus { border-color: var(--info); box-shadow: inset 0 2px 10px rgba(0,0,0,0.1), 0 0 15px rgba(0, 122, 255, 0.3); }
+
+        /* Progress & Hints */
+        .progress-container {
+            width: 100%;
+            height: 8px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            width: 100%;
+            background: var(--success);
+            transition: width 0.3s ease, background-color 0.3s ease;
+        }
+
+        .hint-text {
+            font-size: 22px;
+            font-weight: 600;
+            text-align: center;
+            min-height: 32px;
+            transition: all 0.3s ease;
+        }
+
+        .stats-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 15px;
+            color: var(--text-secondary);
+            background: rgba(0,0,0,0.1);
+            padding: 12px 20px;
+            border-radius: 16px;
+        }
+
+        /* Leaderboard */
+        .leaderboard-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .lb-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--btn-bg);
+            padding: 15px;
+            border-radius: 16px;
+            font-weight: 500;
+        }
+        .lb-rank { font-weight: 700; color: var(--info); width: 30px; }
+        .lb-score { color: var(--success); font-weight: 700; }
+
+        /* Settings Toggle */
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: var(--btn-bg);
+            border-radius: 16px;
+            margin-bottom: 15px;
+        }
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 30px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 30px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .toggle-switch.active { background: var(--success); }
+        .toggle-knob {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 26px;
+            height: 26px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .toggle-switch.active .toggle-knob { transform: translateX(20px); }
+
+        /* Animations */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-10px); }
+            40%, 80% { transform: translateX(10px); }
+        }
+        .shake { animation: shake 0.4s ease-in-out; }
+        
+        @keyframes pop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        .pop { animation: pop 0.3s ease-in-out; }
+
+        /* Header Icons */
+        .icon { font-size: 48px; text-align: center; margin-bottom: 10px; display: block; }
+        .back-btn { margin-top: auto; }
+    </style>
+</head>
+<body>
+
+    <div class="background-container">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+    
+    <canvas id="confetti-canvas"></canvas>
+
+    <div class="app-container">
+
+        <div id="view-home" class="view active">
+            <span class="icon">🔮</span>
+            <h1>Glass Guesser</h1>
+            <p class="subtitle">A visual and auditory sensory experience.</p>
+            
+            <div style="display: flex; flex-direction: column; gap: 15px; margin-top: 20px;">
+                <button class="btn btn-primary" onclick="navTo('view-difficulty')">▶ Start Game</button>
+                <button class="btn" onclick="navTo('view-leaderboard')">🏆 Leaderboard</button>
+                <button class="btn" onclick="navTo('view-settings')">⚙️ Settings & Info</button>
+            </div>
+        </div>
+
+        <div id="view-difficulty" class="view">
+            <h2>Select Difficulty</h2>
+            <p class="subtitle">Choose your challenge level</p>
+            
+            <div class="difficulty-grid">
+                <div class="diff-card" onclick="startGame('easy')">
+                    <h3>Easy</h3>
+                    <p>1 to 50 • 10 Attempts</p>
+                </div>
+                <div class="diff-card" onclick="startGame('medium')">
+                    <h3 style="color: var(--warning)">Medium</h3>
+                    <p>1 to 100 • 7 Attempts</p>
+                </div>
+                <div class="diff-card" onclick="startGame('hard')">
+                    <h3 style="color: var(--error)">Hard</h3>
+                    <p>1 to 1000 • 10 Attempts</p>
+                </div>
+            </div>
+            
+            <button class="btn back-btn" onclick="navTo('view-home')">← Back</button>
+        </div>
+
+        <div id="view-game" class="view">
+            <h2>Guess the Number</h2>
+            <p class="subtitle" id="game-range">Between 1 and 100</p>
+            
+            <div class="hint-text" id="hint-text">Waiting...</div>
+            
+            <div class="progress-container">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+            
+            <div class="input-group">
+                <input type="number" id="guess-input" placeholder="?" autocomplete="off">
+            </div>
+            
+            <button class="btn btn-primary" id="guess-btn" onclick="makeGuess()" style="font-size: 20px; padding: 18px;">Guess</button>
+            
+            <div class="stats-row">
+                <span>Attempts left: <strong id="attempts-left">7</strong></span>
+                <span>Previous: <strong id="prev-guess">--</strong></span>
+            </div>
+            
+            <button class="btn back-btn" onclick="navTo('view-home')">Quit Game</button>
+        </div>
+
+        <div id="view-result" class="view">
+            <span class="icon" id="result-icon">🎉</span>
+            <h1 id="result-title">You Win!</h1>
+            <p class="subtitle" id="result-message">The number was 42.</p>
+            
+            <div style="background: rgba(0,0,0,0.2); padding: 20px; border-radius: 20px; text-align: center; margin-bottom: 20px;">
+                <div style="font-size: 14px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px;">Final Score</div>
+                <div style="font-size: 48px; font-weight: 700; color: var(--success);" id="result-score">1500</div>
+            </div>
+            
+            <button class="btn btn-primary" onclick="navTo('view-difficulty')">Play Again</button>
+            <button class="btn back-btn" onclick="navTo('view-home')">Main Menu</button>
+        </div>
+
+        <div id="view-leaderboard" class="view">
+            <h2>Leaderboard</h2>
+            <p class="subtitle">Top Scores</p>
+            
+            <div class="leaderboard-list" id="leaderboard-list">
+                <!-- Dynamically populated -->
+            </div>
+            
+            <button class="btn back-btn" onclick="navTo('view-home')">← Back</button>
+        </div>
+
+        <div id="view-settings" class="view">
+            <h2>Settings & Info</h2>
+            
+            <div class="setting-row" onclick="toggleTheme()">
+                <span>Light Mode</span>
+                <div class="toggle-switch" id="theme-toggle">
+                    <div class="toggle-knob"></div>
+                </div>
+            </div>
+            
+            <div style="background: rgba(0,0,0,0.1); padding: 20px; border-radius: 16px; margin-bottom: 15px; font-size: 14px; line-height: 1.5;">
+                <strong style="display:block; margin-bottom: 8px;">How to Play:</strong>
+                Select a difficulty. The system will pick a random number. Use the feedback (Too High/Too Low) to guess the number before you run out of attempts. Faster guesses yield higher scores!
+            </div>
+            
+            <button class="btn btn-danger" onclick="clearLeaderboard()">Clear Leaderboard</button>
+            <button class="btn back-btn" onclick="navTo('view-home')">← Back</button>
+        </div>
+
+    </div>
+
+    <script>
+        // --- Game State ---
+        let state = {
+            view: 'view-home',
+            theme: 'dark',
+            target: 0,
+            maxRange: 100,
+            maxAttempts: 7,
+            attemptsLeft: 7,
+            difficultyMultiplier: 1,
+            history: [],
+            isGameOver: false
+        };
+
+        // --- Audio System (Web Audio API) ---
+        let audioCtx;
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playSound(type) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            const now = audioCtx.currentTime;
+            
+            if (type === 'tap') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, now);
+                osc.frequency.exponentialRampToValueAtTime(300, now + 0.1);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'wrong') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            } else if (type === 'win') {
+                osc.type = 'sine';
+                // Arpeggio
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.setValueAtTime(500, now + 0.1);
+                osc.frequency.setValueAtTime(600, now + 0.2);
+                osc.frequency.setValueAtTime(800, now + 0.3);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.6);
+                osc.start(now);
+                osc.stop(now + 0.6);
+            } else if (type === 'lose') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.linearRampToValueAtTime(100, now + 0.5);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.5);
+                osc.start(now);
+                osc.stop(now + 0.5);
+            }
+        }
+
+        // Initialize audio on first touch/click
+        document.body.addEventListener('click', () => { initAudio(); }, { once: true });
+        document.body.addEventListener('touchstart', () => { initAudio(); }, { once: true });
+
+        // Add tap sounds to all buttons
+        document.querySelectorAll('button, .diff-card, .setting-row').forEach(el => {
+            el.addEventListener('click', () => playSound('tap'));
+        });
+
+        // --- Navigation ---
+        function navTo(viewId) {
+            document.querySelectorAll('.view').forEach(v => {
+                v.classList.remove('active');
+            });
+            const target = document.getElementById(viewId);
+            if (target) {
+                target.classList.add('active');
+                state.view = viewId;
+            }
+            if (viewId === 'view-leaderboard') {
+                renderLeaderboard();
+            }
+        }
+
+        function startGame(difficulty) {
+            switch(difficulty) {
+                case 'easy':
+                    state.maxRange = 50; state.maxAttempts = 10; state.difficultyMultiplier = 10;
+                    break;
+                case 'medium':
+                    state.maxRange = 100; state.maxAttempts = 7; state.difficultyMultiplier = 25;
+                    break;
+                case 'hard':
+                    state.maxRange = 1000; state.maxAttempts = 10; state.difficultyMultiplier = 50;
+                    break;
+            }
+            
+            state.target = Math.floor(Math.random() * state.maxRange) + 1;
+            state.attemptsLeft = state.maxAttempts;
+            state.isGameOver = false;
+            
+            // Reset UI
+            document.getElementById('game-range').innerText = `Between 1 and ${state.maxRange}`;
+            document.getElementById('guess-input').value = '';
+            document.getElementById('guess-input').disabled = false;
+            document.getElementById('guess-btn').disabled = false;
+            document.getElementById('prev-guess').innerText = '--';
+            document.getElementById('hint-text').innerText = 'Make your first guess';
+            document.getElementById('hint-text').style.color = 'var(--text-primary)';
+            updateProgressBar();
+            
+            navTo('view-game');
+            setTimeout(() => document.getElementById('guess-input').focus(), 400);
+            
+            // console.log("Cheat:", state.target);
+        }
+
+        function updateProgressBar() {
+            const bar = document.getElementById('progress-bar');
+            document.getElementById('attempts-left').innerText = state.attemptsLeft;
+            
+            const percent = (state.attemptsLeft / state.maxAttempts) * 100;
+            bar.style.width = `${percent}%`;
+            
+            if (percent > 50) bar.style.backgroundColor = 'var(--success)';
+            else if (percent > 25) bar.style.backgroundColor = 'var(--warning)';
+            else bar.style.backgroundColor = 'var(--error)';
+        }
+
+        function setFeedback(msg, color, shake = false) {
+            const hint = document.getElementById('hint-text');
+            hint.innerText = msg;
+            hint.style.color = color;
+            hint.classList.remove('pop');
+            void hint.offsetWidth; // trigger reflow
+            hint.classList.add('pop');
+            
+            if (shake) {
+                const inputGroup = document.querySelector('.input-group');
+                inputGroup.classList.remove('shake');
+                void inputGroup.offsetWidth;
+                inputGroup.classList.add('shake');
+                playSound('wrong');
+            }
+        }
+
+        function makeGuess() {
+            if (state.isGameOver) return;
+            
+            const input = document.getElementById('guess-input');
+            const guess = parseInt(input.value);
+            
+            if (isNaN(guess) || guess < 1 || guess > state.maxRange) {
+                setFeedback(`Enter a number 1-${state.maxRange}`, 'var(--warning)', true);
+                input.value = '';
+                return;
+            }
+            
+            document.getElementById('prev-guess').innerText = guess;
+            state.attemptsLeft--;
+            updateProgressBar();
+            input.value = '';
+            input.focus();
+            
+            if (guess === state.target) {
+                handleWin();
+            } else if (state.attemptsLeft <= 0) {
+                handleLose();
+            } else {
+                const diff = Math.abs(guess - state.target);
+                const threshold = state.maxRange * 0.1; // 10%
+                
+                if (guess > state.target) {
+                    setFeedback(diff > threshold ? 'Way too High! 🥶' : 'A bit high! 🔽', 'var(--warning)', true);
+                } else {
+                    setFeedback(diff > threshold ? 'Way too Low! 🥶' : 'A bit low! 🔼', 'var(--warning)', true);
+                }
+            }
+        }
+
+        // Input enter key support
+        document.getElementById('guess-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') makeGuess();
+        });
+
+        function handleWin() {
+            state.isGameOver = true;
+            playSound('win');
+            triggerConfetti();
+            
+            const score = (state.attemptsLeft + 1) * state.difficultyMultiplier * 10;
+            saveScore(score);
+            
+            document.getElementById('result-icon').innerText = '🏆';
+            document.getElementById('result-title').innerText = 'Brilliant!';
+            document.getElementById('result-title').style.color = 'var(--success)';
+            document.getElementById('result-message').innerText = `You found ${state.target} with ${state.attemptsLeft} attempts left.`;
+            document.getElementById('result-score').innerText = score;
+            
+            setTimeout(() => navTo('view-result'), 800);
+        }
+
+        function handleLose() {
+            state.isGameOver = true;
+            playSound('lose');
+            
+            document.getElementById('result-icon').innerText = '💔';
+            document.getElementById('result-title').innerText = 'Game Over';
+            document.getElementById('result-title').style.color = 'var(--error)';
+            document.getElementById('result-message').innerText = `The secret number was ${state.target}.`;
+            document.getElementById('result-score').innerText = '0';
+            
+            setTimeout(() => navTo('view-result'), 800);
+        }
+
+        // --- Leaderboard System ---
+        function saveScore(score) {
+            let scores = JSON.parse(localStorage.getItem('glassScores') || '[]');
+            scores.push({ date: new Date().toLocaleDateString(), score: score });
+            scores.sort((a, b) => b.score - a.score);
+            scores = scores.slice(0, 10); // Keep top 10
+            localStorage.setItem('glassScores', JSON.stringify(scores));
+        }
+
+        function renderLeaderboard() {
+            const list = document.getElementById('leaderboard-list');
+            const scores = JSON.parse(localStorage.getItem('glassScores') || '[]');
+            
+            if (scores.length === 0) {
+                list.innerHTML = '<div style="text-align:center; color: var(--text-secondary); padding: 20px;">No scores yet. Play a game!</div>';
+                return;
+            }
+            
+            list.innerHTML = scores.map((s, i) => `
+                <div class="lb-item">
+                    <div style="display:flex; align-items:center;">
+                        <span class="lb-rank">#${i+1}</span>
+                        <span>${s.date}</span>
+                    </div>
+                    <span class="lb-score">${s.score}</span>
+                </div>
+            `).join('');
+        }
+
+        function clearLeaderboard() {
+            localStorage.removeItem('glassScores');
+            renderLeaderboard();
+            playSound('tap');
+        }
+
+        // --- Theme System ---
+        function toggleTheme() {
+            const body = document.documentElement;
+            const toggle = document.getElementById('theme-toggle');
+            
+            if (state.theme === 'dark') {
+                state.theme = 'light';
+                body.setAttribute('data-theme', 'light');
+                toggle.classList.add('active');
+            } else {
+                state.theme = 'dark';
+                body.removeAttribute('data-theme');
+                toggle.classList.remove('active');
+            }
+        }
+
+        // --- Custom Confetti System ---
+        const canvas = document.getElementById('confetti-canvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+        let animationId;
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function triggerConfetti() {
+            particles = [];
+            for (let i = 0; i < 150; i++) {
+                particles.push({
+                    x: canvas.width / 2,
+                    y: canvas.height / 2 + 100,
+                    r: Math.random() * 6 + 2,
+                    dx: Math.random() * 20 - 10,
+                    dy: Math.random() * -15 - 5,
+                    color: `hsl(${Math.random() * 360}, 100%, 50%)`,
+                    tilt: Math.random() * 10,
+                    tiltAngle: 0,
+                    tiltAngleInc: (Math.random() * 0.07) + 0.05
+                });
+            }
+            if (!animationId) animateConfetti();
+        }
+
+        function animateConfetti() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            let active = false;
+            
+            particles.forEach(p => {
+                p.tiltAngle += p.tiltAngleInc;
+                p.y += (Math.cos(p.tiltAngle) + 1 + p.r / 2) / 2;
+                p.x += Math.sin(p.tiltAngle) * 2;
+                p.y += p.dy;
+                p.x += p.dx;
+                p.dy += 0.3; // gravity
+
+                if (p.y <= canvas.height) active = true;
+
+                ctx.beginPath();
+                ctx.lineWidth = p.r;
+                ctx.strokeStyle = p.color;
+                ctx.moveTo(p.x + p.tilt + p.r, p.y);
+                ctx.lineTo(p.x + p.tilt, p.y + p.tilt + p.r);
+                ctx.stroke();
+            });
+
+            if (active) {
+                animationId = requestAnimationFrame(animateConfetti);
+            } else {
+                animationId = null;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+        }
+
+    </script>
+</body>
+</html>
